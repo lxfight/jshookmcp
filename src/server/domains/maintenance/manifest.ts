@@ -1,5 +1,5 @@
 import type { DomainManifest, MCPServerContext } from '@server/domains/shared/registry';
-import { bindByDepKey, toolLookup } from '@server/domains/shared/registry';
+import { defineMethodRegistrations, toolLookup } from '@server/domains/shared/registry';
 import {
   tokenBudgetTools,
   cacheTools,
@@ -16,11 +16,84 @@ const DEP_KEY = 'coreMaintenanceHandlers' as const;
 const EXT_DEP_KEY = 'extensionManagementHandlers' as const;
 type H = CoreMaintenanceHandlers;
 type E = ExtensionManagementHandlers;
-const t = toolLookup([...tokenBudgetTools, ...cacheTools, ...artifactTools, ...extensionTools]);
-const b = (invoke: (h: H, a: Record<string, unknown>) => Promise<unknown>) =>
-  bindByDepKey<H>(DEP_KEY, invoke);
-const be = (invoke: (h: E, a: Record<string, unknown>) => Promise<unknown>) =>
-  bindByDepKey<E>(EXT_DEP_KEY, invoke);
+const coreToolDefinitions = [...tokenBudgetTools, ...cacheTools, ...artifactTools] as const;
+const extensionToolDefinitions = [...extensionTools] as const;
+const t = toolLookup([...coreToolDefinitions, ...extensionToolDefinitions]);
+const coreRegistrations = defineMethodRegistrations<
+  H,
+  (typeof coreToolDefinitions)[number]['name']
+>({
+  domain: DOMAIN,
+  depKey: DEP_KEY,
+  lookup: t,
+  entries: [
+    {
+      tool: 'get_token_budget_stats',
+      method: 'handleGetTokenBudgetStats',
+      profiles: ['workflow', 'full'],
+    },
+    { tool: 'manual_token_cleanup', method: 'handleManualTokenCleanup' },
+    { tool: 'reset_token_budget', method: 'handleResetTokenBudget' },
+    {
+      tool: 'get_cache_stats',
+      method: 'handleGetCacheStats',
+      profiles: ['workflow', 'full'],
+    },
+    {
+      tool: 'smart_cache_cleanup',
+      method: 'handleSmartCacheCleanup',
+      mapArgs: (args) => [args.targetSize as number | undefined],
+    },
+    { tool: 'clear_all_caches', method: 'handleClearAllCaches' },
+    {
+      tool: 'cleanup_artifacts',
+      method: 'handleCleanupArtifacts',
+      mapArgs: (args) => [
+        {
+          retentionDays: args.retentionDays as number | undefined,
+          maxTotalBytes: args.maxTotalBytes as number | undefined,
+          dryRun: args.dryRun as boolean | undefined,
+        },
+      ],
+    },
+    {
+      tool: 'doctor_environment',
+      method: 'handleEnvironmentDoctor',
+      mapArgs: (args) => [
+        {
+          includeBridgeHealth: args.includeBridgeHealth as boolean | undefined,
+        },
+      ],
+    },
+  ],
+});
+const extensionRegistrations = defineMethodRegistrations<
+  E,
+  (typeof extensionToolDefinitions)[number]['name']
+>({
+  domain: DOMAIN,
+  depKey: EXT_DEP_KEY,
+  lookup: t,
+  entries: [
+    {
+      tool: 'list_extensions',
+      method: 'handleListExtensions',
+      profiles: ['workflow', 'full'],
+    },
+    { tool: 'reload_extensions', method: 'handleReloadExtensions' },
+    {
+      tool: 'browse_extension_registry',
+      method: 'handleBrowseExtensionRegistry',
+      profiles: ['workflow', 'full'],
+      mapArgs: (args) => [(args.kind as string) ?? 'all'],
+    },
+    {
+      tool: 'install_extension',
+      method: 'handleInstallExtension',
+      mapArgs: (args) => [args.slug as string, args.targetDir as string | undefined],
+    },
+  ],
+});
 
 async function ensure(ctx: MCPServerContext): Promise<H> {
   const { CoreMaintenanceHandlers, ExtensionManagementHandlers } =
@@ -47,80 +120,7 @@ const manifest = {
   secondaryDepKeys: ['extensionManagementHandlers'],
   profiles: ['workflow', 'full'],
   ensure,
-  registrations: [
-    {
-      tool: t('get_token_budget_stats'),
-      domain: DOMAIN,
-      bind: b((h) => h.handleGetTokenBudgetStats()),
-      profiles: ['workflow', 'full'],
-    },
-    {
-      tool: t('manual_token_cleanup'),
-      domain: DOMAIN,
-      bind: b((h) => h.handleManualTokenCleanup()),
-    },
-    {
-      tool: t('reset_token_budget'),
-      domain: DOMAIN,
-      bind: b((h) => h.handleResetTokenBudget()),
-    },
-    {
-      tool: t('get_cache_stats'),
-      domain: DOMAIN,
-      bind: b((h) => h.handleGetCacheStats()),
-      profiles: ['workflow', 'full'],
-    },
-    {
-      tool: t('smart_cache_cleanup'),
-      domain: DOMAIN,
-      bind: b((h, a) => h.handleSmartCacheCleanup(a.targetSize as number | undefined)),
-    },
-    {
-      tool: t('clear_all_caches'),
-      domain: DOMAIN,
-      bind: b((h) => h.handleClearAllCaches()),
-    },
-    {
-      tool: t('cleanup_artifacts'),
-      domain: DOMAIN,
-      bind: b((h, a) =>
-        h.handleCleanupArtifacts({
-          retentionDays: a.retentionDays as number | undefined,
-          maxTotalBytes: a.maxTotalBytes as number | undefined,
-          dryRun: a.dryRun as boolean | undefined,
-        }),
-      ),
-    },
-    {
-      tool: t('doctor_environment'),
-      domain: DOMAIN,
-      bind: b((h, a) =>
-        h.handleEnvironmentDoctor({
-          includeBridgeHealth: a.includeBridgeHealth as boolean | undefined,
-        }),
-      ),
-    },
-    {
-      tool: t('list_extensions'),
-      domain: DOMAIN,
-      bind: be((h) => h.handleListExtensions()),
-      profiles: ['workflow', 'full'],
-    },
-    { tool: t('reload_extensions'), domain: DOMAIN, bind: be((h) => h.handleReloadExtensions()) },
-    {
-      tool: t('browse_extension_registry'),
-      domain: DOMAIN,
-      bind: be((h, a) => h.handleBrowseExtensionRegistry((a.kind as string) ?? 'all')),
-      profiles: ['workflow', 'full'],
-    },
-    {
-      tool: t('install_extension'),
-      domain: DOMAIN,
-      bind: be((h, a) =>
-        h.handleInstallExtension(a.slug as string, a.targetDir as string | undefined),
-      ),
-    },
-  ],
+  registrations: [...coreRegistrations, ...extensionRegistrations],
 } satisfies DomainManifest<typeof DEP_KEY, H, typeof DOMAIN>;
 
 export default manifest;
