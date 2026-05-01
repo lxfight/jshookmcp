@@ -41,6 +41,11 @@ export const browserPageCoreTools: Tool[] = [
         minimum: 0,
         maximum: 10000,
       })
+      .number('timeout', 'Click timeout in ms', {
+        default: 10000,
+        minimum: 1000,
+        maximum: 120000,
+      })
       .string('frameUrl', 'iframe URL substring')
       .string('frameSelector', 'iframe CSS selector')
       .requiredOpenWorld('selector'),

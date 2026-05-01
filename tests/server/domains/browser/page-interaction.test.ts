@@ -90,6 +90,7 @@ describe('PageInteractionHandlers – handlePageClick', () => {
       button: 'left',
       clickCount: 1,
       delay: undefined,
+      timeout: 10000,
     });
     expect(body.success).toBe(true);
     expect(body.message).toContain('#btn');
@@ -102,12 +103,14 @@ describe('PageInteractionHandlers – handlePageClick', () => {
         button: 'right',
         clickCount: 2,
         delay: 100,
+        timeout: 2500,
       }),
     );
     expect(pageController.click).toHaveBeenCalledWith('.item', {
       button: 'right',
       clickCount: 2,
       delay: 100,
+      timeout: 2500,
     });
     expect(body.success).toBe(true);
   });
@@ -231,6 +234,7 @@ describe('PageInteractionHandlers – handlePageClick', () => {
       button: 'right',
       clickCount: 1,
       delay: undefined,
+      timeout: 10000,
     });
   });
 
@@ -240,6 +244,7 @@ describe('PageInteractionHandlers – handlePageClick', () => {
       button: 'left',
       clickCount: 1,
       delay: undefined,
+      timeout: 10000,
     });
   });
 
@@ -291,6 +296,22 @@ describe('PageInteractionHandlers – handlePageClick', () => {
   it('truncates delay to integer', async () => {
     await handlers.handlePageClick({ selector: '#x', delay: 50.9 });
     expect(pageController.click).toHaveBeenCalledWith('#x', expect.objectContaining({ delay: 50 }));
+  });
+
+  it('clamps timeout to min 1000', async () => {
+    await handlers.handlePageClick({ selector: '#x', timeout: 1 });
+    expect(pageController.click).toHaveBeenCalledWith(
+      '#x',
+      expect.objectContaining({ timeout: 1000 }),
+    );
+  });
+
+  it('clamps timeout to max 120000', async () => {
+    await handlers.handlePageClick({ selector: '#x', timeout: 999999 });
+    expect(pageController.click).toHaveBeenCalledWith(
+      '#x',
+      expect.objectContaining({ timeout: 120000 }),
+    );
   });
 });
 

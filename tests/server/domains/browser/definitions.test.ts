@@ -247,6 +247,9 @@ describe('browser tool definitions', () => {
       expect(getInputSchema(tool).required).toContain('selector');
       const buttonProp = getSchemaProperty<Record<string, unknown>>(tool, 'button');
       expect(buttonProp.enum).toEqual(['left', 'right', 'middle']);
+      const timeoutProp = getSchemaProperty<Record<string, unknown>>(tool, 'timeout');
+      expect(timeoutProp.type).toBe('number');
+      expect(timeoutProp.default).toBe(10000);
     });
 
     it('page_type requires selector and text', async () => {

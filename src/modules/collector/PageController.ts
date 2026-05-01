@@ -22,6 +22,7 @@ export interface ClickOptions {
   clickCount?: number;
   delay?: number;
   offset?: { x: number; y: number };
+  timeout?: number;
 }
 
 export interface TypeOptions {
@@ -145,6 +146,7 @@ export class PageController {
   ): Promise<void> {
     const page = await this.collector.getActivePage();
     const context = await this.resolveFrame(page, frameOptions);
+    const timeout = options?.timeout;
     const clickOptions: ClickOptions = {
       button: options?.button || 'left',
       clickCount: options?.clickCount || 1,
@@ -153,7 +155,16 @@ export class PageController {
     if (options?.offset) {
       clickOptions.offset = options.offset;
     }
-    await context.click(selector, clickOptions);
+    if (typeof timeout === 'number' && Number.isFinite(timeout) && timeout > 0) {
+      page.setDefaultTimeout(timeout);
+      try {
+        await context.click(selector, clickOptions);
+      } finally {
+        page.setDefaultTimeout(this.collector['config']?.timeout ?? 30000);
+      }
+    } else {
+      await context.click(selector, clickOptions);
+    }
     logger.info(
       `Clicked: ${selector}${frameOptions?.frameUrl || frameOptions?.frameSelector ? ' (in frame)' : ''}`,
     );

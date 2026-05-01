@@ -129,6 +129,12 @@ export class PageInteractionHandlers {
         max: 60000,
         integer: true,
       });
+      const timeout = this.parseNumberArg(args.timeout, {
+        defaultValue: 10_000,
+        min: 1_000,
+        max: 120_000,
+        integer: true,
+      });
       const frameUrl = argString(args, 'frameUrl');
       const frameSelector = argString(args, 'frameSelector');
       const frameOptions: FrameResolveOptions | undefined =
@@ -154,11 +160,11 @@ export class PageInteractionHandlers {
         if (frameOptions) {
           await this.deps.pageController.click(
             selector,
-            { button, clickCount, delay },
+            { button, clickCount, delay, timeout },
             frameOptions,
           );
         } else {
-          await this.deps.pageController.click(selector, { button, clickCount, delay });
+          await this.deps.pageController.click(selector, { button, clickCount, delay, timeout });
         }
       } catch (error: unknown) {
         const msg = this.toErrorMessage(error);
