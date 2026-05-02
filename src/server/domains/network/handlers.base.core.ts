@@ -23,6 +23,7 @@ import {
   asOptionalString,
   type NetworkRequestPayload,
 } from './handlers.base.types';
+import { getMergedNetworkRequestsFromMonitor } from './request-merge';
 import { R } from '@server/domains/shared/ResponseBuilder';
 import type { ToolResponse } from '@server/types';
 
@@ -100,6 +101,10 @@ export class NetworkHandlersCore {
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  protected async getMergedNetworkRequests(): Promise<NetworkRequestPayload[]> {
+    return await getMergedNetworkRequestsFromMonitor(this.consoleMonitor);
   }
 
   // ── Network enable/disable/status ──
@@ -245,9 +250,7 @@ export class NetworkHandlersCore {
         integer: true,
       });
 
-      let requests = this.consoleMonitor
-        .getNetworkRequests()
-        .filter((req: unknown): req is NetworkRequestPayload => isNetworkRequestPayload(req));
+      let requests = await this.getMergedNetworkRequests();
 
       if (requests.length === 0) {
         return R.ok()

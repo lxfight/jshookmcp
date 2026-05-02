@@ -21,6 +21,8 @@ function createDeps(overrides: Record<string, unknown> = {}) {
     isNetworkEnabled: vi.fn().mockReturnValue(true),
     getNetworkRequests: vi.fn().mockReturnValue(requests),
     getNetworkResponses: vi.fn().mockReturnValue(responses),
+    getXHRRequests: vi.fn().mockResolvedValue([]),
+    getFetchRequests: vi.fn().mockResolvedValue([]),
     getResponseBody: vi.fn().mockResolvedValue(null),
     ...overrides,
   };
@@ -257,6 +259,68 @@ describe('CoreHandlers', () => {
       deps.consoleMonitor.getNetworkRequests.mockReturnValue(reqs);
       const r = await handlers.handleNetworkGetRequests({});
       expect(parseBody(r).optimizationHint).toBeDefined();
+    });
+
+    it('merges injected fetch/xhr records into network_get_requests', async () => {
+      deps.consoleMonitor.getNetworkRequests.mockReturnValue([
+        { requestId: '1', url: 'https://a.com/cdp', method: 'GET', type: 'Fetch', timestamp: 100 },
+      ]);
+      deps.consoleMonitor.getXHRRequests.mockResolvedValue([
+        { url: 'https://a.com/xhr', method: 'POST', timestamp: 101 },
+      ]);
+      deps.consoleMonitor.getFetchRequests.mockResolvedValue([
+        { url: 'https://a.com/fetch', method: 'PUT', timestamp: 102 },
+      ]);
+
+      const r = await handlers.handleNetworkGetRequests({ url: 'a.com' });
+      const body = parseBody(r);
+
+      expect(body.total).toBe(3);
+      expect(
+        body.requests.some((req: any) => req.url === 'https://a.com/xhr' && req.type === 'XHR'),
+      ).toBe(true);
+      expect(
+        body.requests.some((req: any) => req.url === 'https://a.com/fetch' && req.type === 'Fetch'),
+      ).toBe(true);
+    });
+
+    it('preserves monitoring.autoEnabled on successful request responses', async () => {
+      deps.consoleMonitor.isNetworkEnabled.mockReturnValueOnce(false).mockReturnValueOnce(true);
+      deps.consoleMonitor.enable.mockResolvedValue(undefined);
+      deps.consoleMonitor.getNetworkRequests.mockReturnValue([
+        { requestId: '1', url: 'https://a.com/api', method: 'GET', type: 'Fetch', timestamp: 100 },
+      ]);
+
+      const r = await handlers.handleNetworkGetRequests({ autoEnable: true });
+      expect(parseBody(r).monitoring.autoEnabled).toBe(true);
+    });
+
+    it('does not merge distinct repeated requests that only share method/url', async () => {
+      deps.consoleMonitor.getNetworkRequests.mockReturnValue([
+        {
+          requestId: 'cdp-first',
+          url: 'https://a.com/poll',
+          method: 'GET',
+          type: 'Fetch',
+          timestamp: 1_000,
+        },
+        {
+          requestId: 'cdp-second',
+          url: 'https://a.com/poll',
+          method: 'GET',
+          type: 'Fetch',
+          timestamp: 8_000,
+        },
+      ]);
+      deps.consoleMonitor.getFetchRequests.mockResolvedValue([
+        { url: 'https://a.com/poll', method: 'GET', timestamp: 20_000 },
+      ]);
+
+      const r = await handlers.handleNetworkGetRequests({ url: 'poll' });
+      const body = parseBody(r);
+
+      expect(body.total).toBe(3);
+      expect(body.requests.filter((req: any) => req.url === 'https://a.com/poll')).toHaveLength(3);
     });
   });
 

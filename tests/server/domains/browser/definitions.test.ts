@@ -259,6 +259,15 @@ describe('browser tool definitions', () => {
       expect(schema.required).toContain('text');
     });
 
+    it('page_upload_files requires selector and paths', async () => {
+      const tool = getToolByName(browserPageCoreTools, 'page_upload_files');
+      const schema = getInputSchema(tool);
+      expect(schema.required).toContain('selector');
+      expect(schema.required).toContain('paths');
+      expect(schema.properties).toHaveProperty('frameUrl');
+      expect(schema.properties).toHaveProperty('frameSelector');
+    });
+
     it('page_select requires selector and values', async () => {
       const tool = getToolByName(browserPageCoreTools, 'page_select');
       const schema = getInputSchema(tool);

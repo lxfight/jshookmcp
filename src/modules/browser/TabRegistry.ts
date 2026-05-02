@@ -49,6 +49,25 @@ export class TabRegistry<PageLike = unknown> {
   private sharedContext = new Map<string, unknown>();
 
   /**
+   * Register or refresh a page while preserving its previous index when one exists.
+   * This is useful for same-tab navigations where URL/title change but the page handle stays stable.
+   */
+  upsertPage(page: PageLike, meta: { url: string; title: string; index?: number | null }): string {
+    const existingId = this.pageIdByHandle.get(page as object);
+    const existingMeta = existingId ? this.tabsById.get(existingId)?.meta : null;
+    const resolvedIndex =
+      typeof meta.index === 'number' && Number.isFinite(meta.index)
+        ? meta.index
+        : (existingMeta?.index ?? 0);
+
+    return this.registerPage(page, {
+      index: resolvedIndex,
+      url: meta.url,
+      title: meta.title,
+    });
+  }
+
+  /**
    * Register a page and get a stable pageId.
    * If the page object was previously registered, returns its existing pageId.
    */

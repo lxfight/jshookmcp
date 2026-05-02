@@ -120,4 +120,28 @@ describe('TabRegistry', () => {
     expect(registry.getCurrentPageId()).toBeNull();
     expect(registry.getSharedContext('token')).toEqual({ value: null, found: false });
   });
+
+  it('upserts current page metadata without changing the stable page id', () => {
+    const registry = new TabRegistry<object>();
+    const page = {};
+    const pageId = registry.registerPage(page, {
+      index: 2,
+      url: 'https://example.com/old',
+      title: 'Old',
+    });
+    registry.setCurrentPageId(pageId);
+
+    const updatedId = registry.upsertPage(page, {
+      url: 'https://example.com/new',
+      title: 'New',
+    });
+
+    expect(updatedId).toBe(pageId);
+    expect(registry.getContextMeta()).toEqual({
+      url: 'https://example.com/new',
+      title: 'New',
+      tabIndex: 2,
+      pageId,
+    });
+  });
 });

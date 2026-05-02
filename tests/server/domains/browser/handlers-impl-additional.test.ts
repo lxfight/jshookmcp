@@ -48,6 +48,7 @@ const {
   pageInteractionMocks: {
     handlePageClick: vi.fn(async (args: any) => ({ from: 'click', args })),
     handlePageType: vi.fn(async (args: any) => ({ from: 'type', args })),
+    handlePageUploadFiles: vi.fn(async (args: any) => ({ from: 'upload-files', args })),
     handlePageSelect: vi.fn(async (args: any) => ({ from: 'select', args })),
     handlePageHover: vi.fn(async (args: any) => ({ from: 'hover', args })),
     handlePageScroll: vi.fn(async (args: any) => ({ from: 'scroll', args })),
@@ -305,6 +306,13 @@ describe('BrowserToolHandlers — additional delegation coverage', () => {
       const result = await handlers.handlePageType(args);
       expect(pageInteractionMocks.handlePageType).toHaveBeenCalledWith(args);
       expect(result).toEqual({ from: 'type', args });
+    });
+
+    it('delegates handlePageUploadFiles', async () => {
+      const args = { selector: '#upload', paths: ['fixtures/a.txt'] };
+      const result = await handlers.handlePageUploadFiles(args);
+      expect(pageInteractionMocks.handlePageUploadFiles).toHaveBeenCalledWith(args);
+      expect(result).toEqual({ from: 'upload-files', args });
     });
 
     it('delegates handlePageSelect', async () => {

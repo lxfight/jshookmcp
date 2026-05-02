@@ -72,6 +72,7 @@ describe('server/domains/browser/manifest', () => {
     expect(toolNames).toContain('page_reload');
     expect(toolNames).toContain('page_click');
     expect(toolNames).toContain('page_type');
+    expect(toolNames).toContain('page_upload_files');
     expect(toolNames).toContain('page_screenshot');
     expect(toolNames).toContain('page_evaluate');
   });

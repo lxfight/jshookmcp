@@ -97,6 +97,19 @@ describe('outputPaths', () => {
     expect(out.absolutePath.endsWith('custom_name.jpg')).toBe(true);
   });
 
+  it('honors relative requested paths inside the project root without nesting under screenshotDir', async () => {
+    const out = await resolveScreenshotOutputPath({
+      requestedPath: 'screenshots/external/kept-relative',
+      type: 'png',
+    });
+
+    expect(out.absolutePath).toBe(
+      join(projectRoot, 'screenshots', 'external', 'kept-relative.png'),
+    );
+    expect(out.displayPath).toBe('screenshots/external/kept-relative.png');
+    expect(out.pathRewritten).toBe(false);
+  });
+
   it('rewrites traversal attempts outside screenshot root using basename', async () => {
     const out = await resolveScreenshotOutputPath({
       requestedPath: '../system_files/hack.png',

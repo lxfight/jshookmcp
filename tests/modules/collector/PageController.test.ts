@@ -227,9 +227,33 @@ describe('PageController', () => {
   it('uploadFile throws when file input element is missing', async () => {
     page.$.mockResolvedValue(null);
 
-    await expect(controller.uploadFile('#upload', 'D:/tmp/a.txt')).rejects.toThrow(
+    await expect(controller.uploadFile('#upload', 'fixtures/a.txt')).rejects.toThrow(
       'File input not found',
     );
+  });
+
+  it('uploadFile resolves the frame before querying the input when frameSelector is provided', async () => {
+    const uploadFile = vi.fn().mockResolvedValue(undefined);
+    const frameContext = {
+      $: vi.fn().mockResolvedValue({ uploadFile }),
+    };
+    page.$ = vi.fn().mockResolvedValue({
+      contentFrame: vi.fn().mockResolvedValue(frameContext),
+    });
+
+    await controller.uploadFile('#upload', 'fixtures/a.txt', { frameSelector: 'iframe#upload' });
+
+    expect(frameContext.$).toHaveBeenCalledWith('#upload');
+    expect(uploadFile).toHaveBeenCalledWith('fixtures/a.txt');
+  });
+
+  it('uploadFile forwards multiple files in a single call', async () => {
+    const uploadFile = vi.fn().mockResolvedValue(undefined);
+    page.$.mockResolvedValue({ uploadFile });
+
+    await controller.uploadFile('#upload', ['fixtures/a.txt', 'fixtures/b.txt']);
+
+    expect(uploadFile).toHaveBeenCalledWith('fixtures/a.txt', 'fixtures/b.txt');
   });
 
   it('forwards common browser actions and reads page state helpers', async () => {

@@ -292,6 +292,15 @@ describe('initializeBrowserHandlerModules — comprehensive coverage', () => {
       const call = handlers.PageNavigationHandlers.mock.calls[0]![0];
       expect(call.getCamoufoxPage).toBe(deps.getCamoufoxPage);
     });
+
+    it('passes getTabRegistry to PageNavigationHandlers', async () => {
+      const deps = makeDeps();
+      const modules = initializeBrowserHandlerModules(deps);
+
+      const call = handlers.PageNavigationHandlers.mock.calls[0]![0];
+      expect(typeof call.getTabRegistry).toBe('function');
+      expect(call.getTabRegistry()).toBe(modules.tabRegistry);
+    });
   });
 
   describe('PageInteractionHandlers deps', () => {

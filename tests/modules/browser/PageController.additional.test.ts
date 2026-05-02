@@ -23,7 +23,7 @@ type MockCookie = {
 };
 
 type UploadableHandle = {
-  uploadFile: (filePath: string) => Promise<void>;
+  uploadFile: (...filePaths: string[]) => Promise<void>;
 };
 
 function createMockPage(overrides: Record<string, any> = {}) {
@@ -492,17 +492,26 @@ describe('PageController', () => {
       const uploadFileMock = vi.fn(async () => {});
       page.$.mockResolvedValue({ uploadFile: uploadFileMock });
 
-      await controller.uploadFile('#file-input', '/path/to/file.txt');
+      await controller.uploadFile('#file-input', 'fixtures/file.txt');
       expect(page.$).toHaveBeenCalledWith('#file-input');
-      expect(uploadFileMock).toHaveBeenCalledWith('/path/to/file.txt');
+      expect(uploadFileMock).toHaveBeenCalledWith('fixtures/file.txt');
     });
 
     it('throws when file input not found', async () => {
       page.$.mockResolvedValue(null);
 
-      await expect(controller.uploadFile('#missing', '/path/to/file.txt')).rejects.toThrow(
+      await expect(controller.uploadFile('#missing', 'fixtures/file.txt')).rejects.toThrow(
         /File input not found/,
       );
+    });
+
+    it('uploads multiple files via selector in one call', async () => {
+      const uploadFileMock = vi.fn(async () => {});
+      page.$.mockResolvedValue({ uploadFile: uploadFileMock });
+
+      await controller.uploadFile('#file-input', ['fixtures/a.txt', 'fixtures/b.txt']);
+      expect(page.$).toHaveBeenCalledWith('#file-input');
+      expect(uploadFileMock).toHaveBeenCalledWith('fixtures/a.txt', 'fixtures/b.txt');
     });
   });
 

@@ -336,6 +336,9 @@ export class BrowserToolHandlers {
     return this.pageInteraction.handlePageType(args);
   }
 
+  async handlePageUploadFiles(args: Record<string, unknown>) {
+    return this.pageInteraction.handlePageUploadFiles(args);
+  }
   async handlePageSelect(args: Record<string, unknown>) {
     return this.pageInteraction.handlePageSelect(args);
   }

@@ -6,15 +6,23 @@ import type {
   PagePressKeyResponse,
   PageSelectResponse,
   PageTypeResponse,
+  PageUploadFilesResponse,
 } from '@tests/shared/common-test-types';
 
 import { PageInteractionHandlers } from '@server/domains/browser/handlers/page-interaction';
+
+vi.mock('@utils/outputPaths', () => ({
+  resolveRelativeProjectPath: vi.fn(
+    (filePath: string) => `resolved/${filePath.replace(/\\/g, '/')}`,
+  ),
+}));
 
 interface CamoufoxPageMock {
   click: Mock<(selector: string, options: any) => Promise<void>>;
   fill: Mock<(selector: string, text: string) => Promise<void>>;
   hover: Mock<(selector: string) => Promise<void>>;
   selectOption: Mock<(selector: string, values: string[]) => Promise<string[]>>;
+  $: Mock<(selector: string) => Promise<any>>;
   evaluate: Mock<(fn: any, args?: any) => Promise<any>>;
   keyboard: {
     press: Mock<(key: string) => Promise<void>>;
@@ -27,6 +35,7 @@ function createCamoufoxPage(): CamoufoxPageMock {
     fill: vi.fn(async () => {}),
     hover: vi.fn(async () => {}),
     selectOption: vi.fn(async () => ['primary']),
+    $: vi.fn(async () => null),
     evaluate: vi.fn(async () => undefined),
     keyboard: {
       press: vi.fn(async () => {}),
@@ -39,6 +48,9 @@ interface PageControllerMock {
   type: Mock<
     (selector: string, text: string, options: any, frameOptions?: unknown) => Promise<void>
   >;
+  uploadFile: Mock<
+    (selector: string, filePath: string | string[], frameOptions?: unknown) => Promise<void>
+  >;
   select: Mock<(selector: string, values: string[], frameOptions?: unknown) => Promise<void>>;
   hover: Mock<(selector: string, frameOptions?: unknown) => Promise<void>>;
   scroll: Mock<(options: { x: number; y: number }) => Promise<void>>;
@@ -50,6 +62,7 @@ function createPageController(overrides: Partial<PageControllerMock> = {}): Page
   return {
     click: vi.fn(async () => {}),
     type: vi.fn(async () => {}),
+    uploadFile: vi.fn(async () => {}),
     select: vi.fn(async () => {}),
     hover: vi.fn(async () => {}),
     scroll: vi.fn(async () => {}),
@@ -387,6 +400,129 @@ describe('PageInteractionHandlers – handlePageType', () => {
     expect(camoFrame.fill).toHaveBeenCalledWith('#email', 'test@a.com');
     expect(camoPage.fill).not.toHaveBeenCalled();
     expect(body.frame).toEqual({ frameSelector: 'iframe#game' });
+  });
+});
+
+// ─── handlePageUploadFiles ───
+
+describe('PageInteractionHandlers – handlePageUploadFiles', () => {
+  let handlers: PageInteractionHandlers;
+  let pageController: PageControllerMock;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    pageController = createPageController();
+    handlers = new PageInteractionHandlers({
+      pageController: pageController as any,
+      getActiveDriver: () => 'chrome',
+      getCamoufoxPage: async () => null,
+    });
+  });
+
+  it('uploads multiple project-relative files on chrome', async () => {
+    const body = parseJson<PageUploadFilesResponse>(
+      await handlers.handlePageUploadFiles({
+        selector: '#upload',
+        paths: ['fixtures/a.txt', 'fixtures/b.txt'],
+      }),
+    );
+
+    expect(pageController.uploadFile).toHaveBeenCalledTimes(1);
+    expect(pageController.uploadFile).toHaveBeenCalledWith(
+      '#upload',
+      ['resolved/fixtures/a.txt', 'resolved/fixtures/b.txt'],
+      undefined,
+    );
+    expect(body.success).toBe(true);
+    expect(body.count).toBe(2);
+    expect(body.paths).toEqual(['fixtures/a.txt', 'fixtures/b.txt']);
+  });
+
+  it('passes frame options when uploading on chrome', async () => {
+    await handlers.handlePageUploadFiles({
+      selector: '#upload',
+      paths: ['fixtures/a.txt'],
+      frameSelector: 'iframe#form',
+    });
+
+    expect(pageController.uploadFile).toHaveBeenCalledWith('#upload', ['resolved/fixtures/a.txt'], {
+      frameUrl: undefined,
+      frameSelector: 'iframe#form',
+    });
+  });
+
+  it('returns error when selector is missing', async () => {
+    const body = parseJson<PageUploadFilesResponse>(
+      await handlers.handlePageUploadFiles({ paths: ['fixtures/a.txt'] }),
+    );
+
+    expect(body.success).toBe(false);
+    expect(body.message).toContain('selector parameter is required');
+  });
+
+  it('returns error when paths is empty', async () => {
+    const body = parseJson<PageUploadFilesResponse>(
+      await handlers.handlePageUploadFiles({ selector: '#upload', paths: [] }),
+    );
+
+    expect(body.success).toBe(false);
+    expect(body.message).toContain('paths parameter');
+  });
+
+  it('uploads files on camoufox via setInputFiles', async () => {
+    const setInputFiles = vi.fn(async () => {});
+    const camoPage = createCamoufoxPage();
+    camoPage.$.mockResolvedValue({ setInputFiles });
+    handlers = new PageInteractionHandlers({
+      pageController: pageController as any,
+      getActiveDriver: () => 'camoufox',
+      getCamoufoxPage: async () => camoPage as any,
+    });
+
+    const body = parseJson<PageUploadFilesResponse>(
+      await handlers.handlePageUploadFiles({
+        selector: '#upload',
+        paths: ['fixtures/a.txt', 'fixtures/b.txt'],
+      }),
+    );
+
+    expect(camoPage.$).toHaveBeenCalledWith('#upload');
+    expect(setInputFiles).toHaveBeenCalledWith([
+      'resolved/fixtures/a.txt',
+      'resolved/fixtures/b.txt',
+    ]);
+    expect(body.success).toBe(true);
+    expect(body.driver).toBe('camoufox');
+  });
+
+  it('resolves camoufox frame before uploading when frameSelector is provided', async () => {
+    const setInputFiles = vi.fn(async () => {});
+    const camoPage = createCamoufoxPage();
+    const camoFrame = {
+      $: vi.fn(async () => ({ setInputFiles })),
+    };
+    pageController.resolveFrame.mockResolvedValueOnce(camoFrame);
+    handlers = new PageInteractionHandlers({
+      pageController: pageController as any,
+      getActiveDriver: () => 'camoufox',
+      getCamoufoxPage: async () => camoPage as any,
+    });
+
+    const body = parseJson<any>(
+      await handlers.handlePageUploadFiles({
+        selector: '#upload',
+        paths: ['fixtures/a.txt'],
+        frameSelector: 'iframe#form',
+      }),
+    );
+
+    expect(pageController.resolveFrame).toHaveBeenCalledWith(camoPage, {
+      frameUrl: undefined,
+      frameSelector: 'iframe#form',
+    });
+    expect(camoFrame.$).toHaveBeenCalledWith('#upload');
+    expect(setInputFiles).toHaveBeenCalledWith(['resolved/fixtures/a.txt']);
+    expect(body.frame).toEqual({ frameSelector: 'iframe#form' });
   });
 });
 

@@ -18,6 +18,7 @@ import {
 } from '../handlers.base.types';
 import type { NetworkHandlerDeps } from './shared';
 import { getDetailedDataManager, parseBooleanArg, parseNumberArg } from './shared';
+import { getMergedNetworkRequestsFromMonitor } from '../request-merge';
 
 export class CoreHandlers {
   private detailedDataManager = getDetailedDataManager();
@@ -127,6 +128,10 @@ export class CoreHandlers {
 
   // ── Network requests ──
 
+  private async getMergedNetworkRequests(): Promise<NetworkRequestPayload[]> {
+    return await getMergedNetworkRequestsFromMonitor(this.deps.consoleMonitor);
+  }
+
   async handleNetworkGetRequests(args: Record<string, unknown>): Promise<ToolResponse> {
     try {
       const autoEnable = parseBooleanArg(args.autoEnable, true);
@@ -158,10 +163,7 @@ export class CoreHandlers {
         integer: true,
       });
 
-      const requests = this.deps.consoleMonitor
-        .getNetworkRequests()
-        .filter((req: unknown): req is NetworkRequestPayload => isNetworkRequestPayload(req))
-        .map((r) => r as unknown as NetworkRequestPayload);
+      const requests = await this.getMergedNetworkRequests();
 
       if (requests.length === 0) {
         return this.buildEmptyRequestsResponse(networkState.autoEnabled);
@@ -176,6 +178,7 @@ export class CoreHandlers {
         tail,
         limit,
         offset,
+        autoEnabled: networkState.autoEnabled,
       });
 
       const processedResult = this.detailedDataManager.smartHandle(result.finalPayload, 25600);
@@ -420,9 +423,20 @@ export class CoreHandlers {
       tail?: number;
       limit: number;
       offset: number;
+      autoEnabled: boolean;
     },
   ) {
-    const { url, urlRegex, method, sinceTimestamp, sinceRequestId, tail, limit, offset } = filters;
+    const {
+      url,
+      urlRegex,
+      method,
+      sinceTimestamp,
+      sinceRequestId,
+      tail,
+      limit,
+      offset,
+      autoEnabled,
+    } = filters;
     const originalCount = requests.length;
     const allUrls = requests.map((r) => r.url);
 
@@ -526,7 +540,9 @@ export class CoreHandlers {
         },
         filtered: hasAnyFilter,
         filters: { url, urlRegex, method, sinceTimestamp, sinceRequestId, tail, limit, offset },
-        monitoring: {},
+        monitoring: {
+          autoEnabled,
+        },
         ...(filterMiss && {
           filterMiss: true,
           hint: `URL filter "${url}" matched 0 of ${originalCount} captured requests. Check urlSamples to verify the correct filter substring.`,

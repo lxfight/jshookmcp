@@ -61,6 +61,10 @@ interface UploadableElementHandle {
   uploadFile: (...filePaths: string[]) => Promise<void>;
 }
 
+interface UploadContextLike {
+  $(selector: string): Promise<UploadableElementHandle | null>;
+}
+
 export class PageController {
   constructor(private collector: CodeCollector) {}
 
@@ -543,16 +547,24 @@ export class PageController {
     logger.info(`Pressed key: ${key}`);
   }
 
-  async uploadFile(selector: string, filePath: string): Promise<void> {
+  async uploadFile(
+    selector: string,
+    filePath: string | string[],
+    frameOptions?: FrameResolveOptions,
+  ): Promise<void> {
     const page = await this.collector.getActivePage();
-    const input = await page.$(selector);
+    const context = frameOptions
+      ? ((await this.resolveFrame(page, frameOptions)) as unknown as UploadContextLike)
+      : (page as unknown as UploadContextLike);
+    const input = await context.$(selector);
 
     if (!input) {
       throw new Error(`File input not found: ${selector}`);
     }
 
-    await (input as unknown as UploadableElementHandle).uploadFile(filePath);
-    logger.info(`File uploaded: ${filePath}`);
+    const filePaths = Array.isArray(filePath) ? filePath : [filePath];
+    await (input as unknown as UploadableElementHandle).uploadFile(...filePaths);
+    logger.info(`File uploaded: ${filePaths.join(', ')}`);
   }
 
   async getAllLinks(): Promise<Array<{ text: string; href: string }>> {

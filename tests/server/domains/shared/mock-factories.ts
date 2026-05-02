@@ -48,9 +48,12 @@ export interface ConsoleMonitorMirror {
   getNetworkStatus: Mock<() => unknown>;
   getNetworkRequests: Mock<() => unknown[]>;
   getNetworkResponses: Mock<() => unknown[]>;
+  getXHRRequests: Mock<() => Promise<unknown[]>>;
+  getFetchRequests: Mock<() => Promise<unknown[]>>;
   getResponseBody: Mock<
     (requestId: string) => Promise<{ body: string; base64Encoded: boolean } | null>
   >;
+  markContextChanged: Mock<() => void>;
   setPlaywrightPage: Mock<(page: unknown) => void>;
   clearPlaywrightPage: Mock<() => void>;
 }
@@ -120,7 +123,10 @@ export function createConsoleMonitorMock(
     getNetworkStatus: vi.fn(() => ({})),
     getNetworkRequests: vi.fn(() => []),
     getNetworkResponses: vi.fn(() => []),
+    getXHRRequests: vi.fn(async () => []),
+    getFetchRequests: vi.fn(async () => []),
     getResponseBody: vi.fn(async () => ({ body: '', base64Encoded: false })),
+    markContextChanged: vi.fn(),
     setPlaywrightPage: vi.fn(),
     clearPlaywrightPage: vi.fn(),
     ...overrides,

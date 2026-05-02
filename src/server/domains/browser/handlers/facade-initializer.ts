@@ -112,6 +112,7 @@ export function initializeBrowserHandlerModules(
     pageNavigation: new PageNavigationHandlers({
       pageController: deps.pageController,
       consoleMonitor: deps.consoleMonitor,
+      getTabRegistry: () => tabRegistry,
       eventBus: deps.eventBus,
       ...commonDeps,
     }),

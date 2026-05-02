@@ -125,6 +125,12 @@ export interface PageTypeResponse extends PageInteractionResponse {
   selector?: string;
 }
 
+export interface PageUploadFilesResponse extends PageInteractionResponse {
+  selector?: string;
+  count?: number;
+  paths?: string[];
+}
+
 export interface PageSelectResponse extends PageInteractionResponse {
   selector?: string;
 }

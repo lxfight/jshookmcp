@@ -1,7 +1,11 @@
+import { writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { MCPTestClient } from '@tests/e2e/helpers/mcp-client';
 
 const TARGET_URL = process.env.E2E_TARGET_URL;
+const UPLOAD_FIXTURE_A = join(process.cwd(), 'tests', 'tmp', 'portable-upload-a.txt');
+const UPLOAD_FIXTURE_B = join(process.cwd(), 'tests', 'tmp', 'portable-upload-b.txt');
 
 function hasPrerequisites(client: MCPTestClient, tools: string[]): string[] {
   return tools.filter((tool) => !client.getToolMap().has(tool));
@@ -14,6 +18,8 @@ describe.skipIf(!TARGET_URL)(
     const client = new MCPTestClient();
 
     beforeAll(async () => {
+      await writeFile(UPLOAD_FIXTURE_A, 'portable upload fixture A\n', 'utf8');
+      await writeFile(UPLOAD_FIXTURE_B, 'portable upload fixture B\n', 'utf8');
       await client.connect();
     });
 
@@ -103,7 +109,58 @@ describe.skipIf(!TARGET_URL)(
       expect(describeTool.result.status).not.toBe('FAIL');
     });
 
-    test('PORTABLE-04: trace lifecycle degrades cleanly when optional deps are absent', async () => {
+    test('PORTABLE-04: upload multiple files via real MCP tool call', async () => {
+      const missing = hasPrerequisites(client, [
+        'browser_launch',
+        'page_navigate',
+        'page_upload_files',
+        'page_evaluate',
+      ]);
+      if (missing.length > 0) {
+        client.recordSynthetic('portable-upload', 'SKIP', `Missing: ${missing.join(', ')}`);
+        return;
+      }
+
+      const launch = await client.call('browser_launch', { headless: true }, 60_000);
+      expect(launch.result.status).not.toBe('FAIL');
+
+      const uploadPage =
+        'data:text/html,<html><body><input id="upload" type="file" multiple /><script>window.__uploadNames = [];</script></body></html>';
+      const navigate = await client.call(
+        'page_navigate',
+        { url: uploadPage, waitUntil: 'load', timeout: 15_000 },
+        30_000,
+      );
+      expect(navigate.result.status).not.toBe('FAIL');
+
+      const upload = await client.call(
+        'page_upload_files',
+        {
+          selector: '#upload',
+          paths: ['tests/tmp/portable-upload-a.txt', 'tests/tmp/portable-upload-b.txt'],
+        },
+        20_000,
+      );
+      expect(upload.result.status).not.toBe('FAIL');
+
+      const evaluation = await client.call(
+        'page_evaluate',
+        {
+          code: `(() => Array.from(document.querySelector('#upload')?.files ?? []).map((file) => file.name))()`,
+        },
+        15_000,
+      );
+      expect(evaluation.result.status).not.toBe('FAIL');
+      expect((evaluation.parsed as { result?: unknown }).result).toEqual([
+        'portable-upload-a.txt',
+        'portable-upload-b.txt',
+      ]);
+      expect((evaluation.parsed as { _tabContext?: { title?: string } })._tabContext?.title).toBe(
+        '',
+      );
+    });
+
+    test('PORTABLE-05: trace lifecycle degrades cleanly when optional deps are absent', async () => {
       const missing = hasPrerequisites(client, [
         'start_trace_recording',
         'stop_trace_recording',

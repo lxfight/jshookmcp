@@ -1,6 +1,7 @@
 import { parseJson } from '@tests/server/domains/shared/mock-factories';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PageNavigationHandlers } from '@server/domains/browser/handlers/page-navigation';
+import { TabRegistry } from '@modules/browser/TabRegistry';
 
 type Driver = 'chrome' | 'camoufox';
 type NavigationResponse = {
@@ -29,6 +30,7 @@ type CamoufoxPageStub = {
 };
 
 function mockDeps(driver: Driver = 'chrome') {
+  const activeChromePage = {};
   const gotoMock = vi.fn<CamoufoxPageStub['goto']>().mockResolvedValue(undefined);
   const camoufoxReloadMock = vi.fn<CamoufoxPageStub['reload']>().mockResolvedValue(undefined);
   const camoufoxGoBackMock = vi.fn<CamoufoxPageStub['goBack']>().mockResolvedValue(undefined);
@@ -65,6 +67,7 @@ function mockDeps(driver: Driver = 'chrome') {
     reload: reloadMock,
     goBack: goBackMock,
     goForward: goForwardMock,
+    getPage: vi.fn(async () => activeChromePage),
     getURL: getURLMock,
     getTitle: getTitleMock,
   } satisfies PageControllerStub;
@@ -83,11 +86,13 @@ function mockDeps(driver: Driver = 'chrome') {
     isNetworkEnabled: isNetworkEnabledMock,
   } satisfies ConsoleMonitorStub;
 
+  const tabRegistry = new TabRegistry<object>();
   const deps = {
     pageController: pageController as unknown as PageNavigationDeps['pageController'],
     consoleMonitor: consoleMonitor as unknown as PageNavigationDeps['consoleMonitor'],
     getActiveDriver: vi.fn<PageNavigationDeps['getActiveDriver']>().mockReturnValue(driver),
     getCamoufoxPage: vi.fn<PageNavigationDeps['getCamoufoxPage']>().mockResolvedValue(camoufoxPage),
+    getTabRegistry: vi.fn(() => tabRegistry),
   } satisfies PageNavigationDeps;
 
   return {
@@ -95,6 +100,8 @@ function mockDeps(driver: Driver = 'chrome') {
     camoufoxPage,
     pageController,
     consoleMonitor,
+    tabRegistry,
+    activeChromePage,
   };
 }
 
@@ -180,6 +187,45 @@ describe('PageNavigationHandlers', () => {
         'https://test.com',
         expect.objectContaining({ waitUntil: 'load' }),
       );
+    });
+
+    it('updates tab registry context immediately after chrome navigation', async () => {
+      const { deps, tabRegistry, activeChromePage } = mockDeps('chrome');
+      const pageId = tabRegistry.registerPage(activeChromePage, {
+        index: 4,
+        url: 'https://old.example',
+        title: 'Old',
+      });
+      const handler = new PageNavigationHandlers(deps);
+
+      await handler.handlePageNavigate({ url: 'https://test.com' });
+
+      expect(tabRegistry.getContextMeta()).toEqual({
+        url: 'https://example.com/chrome',
+        title: 'Chrome Page',
+        tabIndex: 4,
+        pageId,
+      });
+    });
+
+    it('updates tab registry when chrome navigation returns an empty title', async () => {
+      const { deps, tabRegistry, activeChromePage, pageController } = mockDeps('chrome');
+      pageController.getTitle.mockResolvedValueOnce('');
+      const pageId = tabRegistry.registerPage(activeChromePage, {
+        index: 2,
+        url: 'https://before.example/blank',
+        title: 'Before',
+      });
+      const handler = new PageNavigationHandlers(deps);
+
+      await handler.handlePageNavigate({ url: 'https://test.com' });
+
+      expect(tabRegistry.getContextMeta()).toEqual({
+        url: 'https://example.com/chrome',
+        title: '',
+        tabIndex: 2,
+        pageId,
+      });
     });
   });
 

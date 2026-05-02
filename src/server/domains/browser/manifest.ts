@@ -34,6 +34,7 @@ const registrations = defineMethodRegistrations<H, (typeof toolDefinitions)[numb
     { tool: 'page_forward', method: 'handlePageForward' },
     { tool: 'page_click', method: 'handlePageClick' },
     { tool: 'page_type', method: 'handlePageType' },
+    { tool: 'page_upload_files', method: 'handlePageUploadFiles' },
     { tool: 'page_select', method: 'handlePageSelect' },
     { tool: 'page_hover', method: 'handlePageHover' },
     { tool: 'page_scroll', method: 'handlePageScroll' },
@@ -131,6 +132,9 @@ const manifest = {
       { condition: 'Browser must be launched', fix: 'Call browser_launch or browser_attach first' },
     ],
     page_type: [
+      { condition: 'Browser must be launched', fix: 'Call browser_launch or browser_attach first' },
+    ],
+    page_upload_files: [
       { condition: 'Browser must be launched', fix: 'Call browser_launch or browser_attach first' },
     ],
     page_screenshot: [

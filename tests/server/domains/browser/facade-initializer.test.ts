@@ -249,4 +249,13 @@ describe('initializeBrowserHandlerModules', () => {
     const controlCall = handlers.BrowserControlHandlers.mock.calls[0]![0];
     expect(controlCall.getTabRegistry()).toBe(modules.tabRegistry);
   });
+
+  it('passes getTabRegistry to PageNavigationHandlers', async () => {
+    const deps = makeDeps();
+    const modules = initializeBrowserHandlerModules(deps);
+
+    const call = handlers.PageNavigationHandlers.mock.calls[0]![0];
+    expect(typeof call.getTabRegistry).toBe('function');
+    expect(call.getTabRegistry()).toBe(modules.tabRegistry);
+  });
 });

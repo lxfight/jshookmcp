@@ -3,9 +3,14 @@ import type { FrameResolveOptions } from '@modules/collector/PageController';
 import { argString, argNumber, argStringArray } from '@server/domains/shared/parse-args';
 import { R } from '@server/domains/shared/ResponseBuilder';
 import type { ToolResponse } from '@server/domains/shared/ResponseBuilder';
+import { resolveRelativeProjectPath } from '@utils/outputPaths';
 
 interface CamoufoxKeyboardLike {
   press(key: string): Promise<void>;
+}
+
+interface CamoufoxFileInputLike {
+  setInputFiles(files: string[]): Promise<void>;
 }
 
 interface CamoufoxInteractionContextLike {
@@ -20,6 +25,7 @@ interface CamoufoxInteractionContextLike {
 
 interface CamoufoxFrameElementLike {
   contentFrame(): Promise<CamoufoxInteractionContextLike | null>;
+  setInputFiles?(files: string[]): Promise<void>;
 }
 
 interface CamoufoxFrameLike extends CamoufoxInteractionContextLike {
@@ -223,6 +229,66 @@ export class PageInteractionHandlers {
 
       return R.ok().build({
         message: `Typed into ${selector}`,
+        ...(frameOptions ? { frame: frameOptions } : {}),
+      });
+    } catch (e) {
+      return R.fail(e).build();
+    }
+  }
+
+  async handlePageUploadFiles(args: Record<string, unknown>): Promise<ToolResponse> {
+    try {
+      const selector = argString(args, 'selector', '');
+      const paths = argStringArray(args, 'paths')
+        .map((value) => value.trim())
+        .filter(Boolean);
+      const frameUrl = argString(args, 'frameUrl');
+      const frameSelector = argString(args, 'frameSelector');
+      const frameOptions: FrameResolveOptions | undefined =
+        frameUrl || frameSelector
+          ? { frameUrl: frameUrl || undefined, frameSelector: frameSelector || undefined }
+          : undefined;
+
+      if (!selector || selector.trim().length === 0) {
+        return R.fail('selector parameter is required').build();
+      }
+      if (paths.length === 0) {
+        return R.fail('paths parameter must contain at least one relative file path').build();
+      }
+
+      const resolvedPaths = paths.map((filePath) => resolveRelativeProjectPath(filePath));
+
+      if (this.deps.getActiveDriver() === 'camoufox') {
+        const page = (await this.deps.getCamoufoxPage()) as CamoufoxPageLike;
+        const context = frameOptions
+          ? await this.deps.pageController.resolveFrame(page as any, frameOptions)
+          : page;
+        const fileInput = (await (context as CamoufoxPageLike).$(
+          selector,
+        )) as CamoufoxFileInputLike | null;
+
+        if (!fileInput || typeof fileInput.setInputFiles !== 'function') {
+          return R.fail(`File input not found: ${selector}`).build({ driver: 'camoufox' });
+        }
+
+        await fileInput.setInputFiles(resolvedPaths);
+        return R.ok().build({
+          driver: 'camoufox',
+          selector,
+          count: resolvedPaths.length,
+          paths,
+          message: `Uploaded ${resolvedPaths.length} file(s) into ${selector}`,
+          ...(frameOptions ? { frame: frameOptions } : {}),
+        });
+      }
+
+      await this.deps.pageController.uploadFile(selector, resolvedPaths, frameOptions);
+
+      return R.ok().build({
+        selector,
+        count: resolvedPaths.length,
+        paths,
+        message: `Uploaded ${resolvedPaths.length} file(s) into ${selector}`,
         ...(frameOptions ? { frame: frameOptions } : {}),
       });
     } catch (e) {

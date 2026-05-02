@@ -29,8 +29,12 @@ function resolveProjectRoot(env: NodeJS.ProcessEnv = process.env): string {
   }
 
   return normalize(
-    isAbsolute(requestedRoot) ? requestedRoot : resolve(defaultProjectRoot, requestedRoot),
+    isUserAbsolutePath(requestedRoot) ? requestedRoot : resolve(defaultProjectRoot, requestedRoot),
   );
+}
+
+function isUserAbsolutePath(inputPath: string): boolean {
+  return isAbsolute(inputPath) || /^[A-Za-z]:[\\/]/.test(inputPath) || inputPath.startsWith('\\\\');
 }
 
 function isInside(baseDir: string, targetPath: string): boolean {
@@ -42,7 +46,9 @@ function isInside(baseDir: string, targetPath: string): boolean {
 }
 
 function resolveWithinProject(inputPath: string, baseRoot = getProjectRoot()): string {
-  const candidate = isAbsolute(inputPath) ? normalize(inputPath) : resolve(baseRoot, inputPath);
+  const candidate = isUserAbsolutePath(inputPath)
+    ? normalize(inputPath)
+    : resolve(baseRoot, inputPath);
   return isInside(baseRoot, candidate)
     ? candidate
     : resolve(
@@ -62,6 +68,25 @@ function withDefaultExtension(filePath: string, extension: string): string {
 
 export function getProjectRoot(): string {
   return resolveProjectRoot();
+}
+
+export function resolveRelativeProjectPath(inputPath: string): string {
+  const projectRoot = getProjectRoot();
+  const requested = inputPath.trim();
+
+  if (!requested) {
+    throw new Error('path must be a non-empty relative path within the project root');
+  }
+  if (isUserAbsolutePath(requested)) {
+    throw new Error('path must be relative to the project root');
+  }
+
+  const resolvedPath = normalize(resolve(projectRoot, requested));
+  if (!isInside(projectRoot, resolvedPath)) {
+    throw new Error('path must stay within the project root');
+  }
+
+  return resolvedPath;
 }
 
 export function resolveOutputDirectory(
@@ -133,14 +158,14 @@ export async function resolveScreenshotOutputPath(options: {
     pathRewritten = true;
   } else {
     const requestedWithExt = withDefaultExtension(requested, extension);
-    if (isAbsolute(requestedWithExt)) {
+    if (isUserAbsolutePath(requestedWithExt)) {
       // SECURITY: Do NOT honor user-provided absolute paths — rewrite to safe dir.
       // This prevents arbitrary file overwrite via the screenshot tool.
       absolutePath = resolve(screenshotRoot, basename(requestedWithExt));
       pathRewritten = true;
     } else {
-      absolutePath = resolve(screenshotRoot, requestedWithExt);
-      if (!isInside(screenshotRoot, absolutePath)) {
+      absolutePath = resolve(projectRoot, requestedWithExt);
+      if (!isInside(projectRoot, absolutePath)) {
         absolutePath = resolve(screenshotRoot, basename(absolutePath));
         pathRewritten = true;
       }
@@ -149,8 +174,8 @@ export async function resolveScreenshotOutputPath(options: {
 
   await mkdir(dirname(absolutePath), { recursive: true });
 
-  const displayPath = isAbsolute(requested || '')
-    ? absolutePath.replace(/\\/g, '/')
-    : relative(projectRoot, absolutePath).replace(/\\/g, '/');
+  const displayPath = isInside(projectRoot, absolutePath)
+    ? relative(projectRoot, absolutePath).replace(/\\/g, '/')
+    : absolutePath.replace(/\\/g, '/');
   return { absolutePath, displayPath, pathRewritten };
 }

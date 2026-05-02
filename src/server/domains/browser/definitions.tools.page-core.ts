@@ -60,6 +60,16 @@ export const browserPageCoreTools: Tool[] = [
       .string('frameSelector', 'iframe CSS selector')
       .requiredOpenWorld('selector', 'text'),
   ),
+  tool('page_upload_files', (t) =>
+    t
+      .desc('Upload one or more local files into an <input type="file"> element.')
+      .string('selector', 'CSS selector for the file input')
+      .array('paths', { type: 'string' }, 'Project-relative file paths to upload')
+      .string('frameUrl', 'iframe URL substring')
+      .string('frameSelector', 'iframe CSS selector')
+      .required('selector', 'paths')
+      .openWorld(),
+  ),
   tool('page_select', (t) =>
     t
       .desc('Select option(s) in a <select> element.')

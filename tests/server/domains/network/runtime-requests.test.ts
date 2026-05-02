@@ -83,6 +83,152 @@ describe('AdvancedHandlersBase (requests)', () => {
       expect(body.monitoring.autoEnabled).toBe(true);
     });
 
+    it('returns injected fetch/xhr requests even when CDP request list is empty', async () => {
+      consoleMonitor.isNetworkEnabled.mockReturnValue(true);
+      consoleMonitor.getNetworkRequests.mockReturnValue([]);
+      consoleMonitor.getFetchRequests.mockResolvedValue([
+        {
+          url: 'https://example.com/api/fetch-only',
+          method: 'POST',
+          status: 200,
+          timestamp: 1234,
+        },
+      ]);
+
+      const body = parseJson<NetworkRequestsResponse>(await handler.handleNetworkGetRequests({}));
+      expect(body.success).toBe(true);
+      expect(body.total).toBe(1);
+      expect(body.requests[0]).toMatchObject({
+        url: 'https://example.com/api/fetch-only',
+        method: 'POST',
+        type: 'Fetch',
+        injected: true,
+      });
+    });
+
+    it('merges injected requests with CDP requests without duplicating identical entries', async () => {
+      consoleMonitor.isNetworkEnabled.mockReturnValue(true);
+      consoleMonitor.getNetworkRequests.mockReturnValue([
+        {
+          requestId: 'cdp-1',
+          url: 'https://example.com/api/one',
+          method: 'GET',
+          type: 'XHR',
+          timestamp: 111,
+        },
+        {
+          requestId: 'dup-1',
+          url: 'https://example.com/api/dup',
+          method: 'POST',
+          type: 'Fetch',
+          timestamp: 222,
+        },
+      ]);
+      consoleMonitor.getFetchRequests.mockResolvedValue([
+        {
+          requestId: 'dup-1',
+          url: 'https://example.com/api/dup',
+          method: 'POST',
+          timestamp: 222,
+          status: 201,
+        },
+      ]);
+      consoleMonitor.getXHRRequests.mockResolvedValue([
+        {
+          url: 'https://example.com/api/two',
+          method: 'GET',
+          timestamp: 333,
+        },
+      ]);
+
+      const body = parseJson<NetworkRequestsResponse>(
+        await handler.handleNetworkGetRequests({ url: 'api' }),
+      );
+
+      expect(body.total).toBe(3);
+      expect(
+        body.requests.filter((req: any) => req.url === 'https://example.com/api/dup'),
+      ).toHaveLength(1);
+      expect(
+        body.requests.find((req: any) => req.url === 'https://example.com/api/two'),
+      ).toMatchObject({
+        type: 'XHR',
+        injected: true,
+      });
+    });
+
+    it('deduplicates same method/url when timestamps are close but from different clocks', async () => {
+      consoleMonitor.isNetworkEnabled.mockReturnValue(true);
+      consoleMonitor.getNetworkRequests.mockReturnValue([
+        {
+          requestId: 'cdp-near',
+          url: 'https://example.com/api/near',
+          method: 'GET',
+          type: 'Fetch',
+          timestamp: 1000,
+        },
+      ]);
+      consoleMonitor.getFetchRequests.mockResolvedValue([
+        {
+          url: 'https://example.com/api/near',
+          method: 'GET',
+          timestamp: 2200,
+          status: 200,
+        },
+      ]);
+
+      const body = parseJson<NetworkRequestsResponse>(
+        await handler.handleNetworkGetRequests({ url: 'near' }),
+      );
+
+      expect(body.total).toBe(1);
+      expect(body.requests[0]).toMatchObject({
+        requestId: 'cdp-near',
+        url: 'https://example.com/api/near',
+        method: 'GET',
+      });
+    });
+
+    it('does not merge repeated requests that only share method and url when timestamps are far apart', async () => {
+      consoleMonitor.isNetworkEnabled.mockReturnValue(true);
+      consoleMonitor.getNetworkRequests.mockReturnValue([
+        {
+          requestId: 'cdp-first',
+          url: 'https://example.com/api/poll',
+          method: 'GET',
+          type: 'Fetch',
+          timestamp: 1_000,
+        },
+        {
+          requestId: 'cdp-second',
+          url: 'https://example.com/api/poll',
+          method: 'GET',
+          type: 'Fetch',
+          timestamp: 8_000,
+        },
+      ]);
+      consoleMonitor.getFetchRequests.mockResolvedValue([
+        {
+          url: 'https://example.com/api/poll',
+          method: 'GET',
+          timestamp: 20_000,
+          status: 200,
+        },
+      ]);
+
+      const body = parseJson<NetworkRequestsResponse>(
+        await handler.handleNetworkGetRequests({ url: 'poll' }),
+      );
+
+      expect(body.total).toBe(3);
+      expect(
+        body.requests.filter((req: any) => req.url === 'https://example.com/api/poll'),
+      ).toHaveLength(3);
+      expect(body.requests.map((req: any) => req.requestId)).toEqual(
+        expect.arrayContaining(['cdp-first', 'cdp-second']),
+      );
+    });
+
     it('returns all requests when no filter is specified', async () => {
       consoleMonitor.isNetworkEnabled.mockReturnValue(true);
       consoleMonitor.getNetworkRequests.mockReturnValue([
