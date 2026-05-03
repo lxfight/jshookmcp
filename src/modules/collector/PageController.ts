@@ -299,7 +299,8 @@ export class PageController {
       if (!frame) {
         const available = frames.map((f) => f.url()).filter((u) => u && u !== 'about:blank');
         throw new Error(
-          `No frame matching URL substring "${options.frameUrl}". Available frames: ${available.join(', ') || '(none)'}`,
+          `No frame matching URL substring "${options.frameUrl}". Available frames: ` +
+            `${available.join(', ') || '(none)'}`,
         );
       }
       return frame;
@@ -481,7 +482,8 @@ export class PageController {
 
     if (!resolvedDevice) {
       throw new Error(
-        `Unsupported device "${deviceName}". Supported values include: iPhone, iPad, Android (aliases like "iPhone 13" are accepted).`,
+        `Unsupported device "${deviceName}". Supported values include: iPhone, iPad, Android (aliases like "iPhone ` +
+          `13" are accepted).`,
       );
     }
 
@@ -618,7 +620,8 @@ async function checkPageCDPHealth(page: Page, timeoutMs = 500): Promise<void> {
     if (msg === 'cdp_unreachable') {
       throw new Error(
         'CDP session unresponsive — the debugger may be blocking page evaluation. ' +
-          "Call debugger_lifecycle({ action: 'disable' })() before this tool, or run it before debugger_lifecycle({ action: 'enable' })().",
+          "Call debugger_lifecycle({ action: 'disable' })() before this tool, or run it before " +
+          "debugger_lifecycle({ action: 'enable' })().",
         { cause: err },
       );
     }

@@ -116,7 +116,8 @@ export class CodeCollector {
     this.smartCollector = new SmartCodeCollector();
     this.compressor = new CodeCompressor();
     logger.info(
-      ` CodeCollector limits: maxCollect=${this.MAX_FILES_PER_COLLECT} files, maxResponse=${(this.MAX_RESPONSE_SIZE / 1024).toFixed(0)}KB, maxSingle=${(this.MAX_SINGLE_FILE_SIZE / 1024).toFixed(0)}KB`,
+      ` CodeCollector limits: maxCollect=${this.MAX_FILES_PER_COLLECT} files, maxResponse=` +
+        `${(this.MAX_RESPONSE_SIZE / 1024).toFixed(0)}KB, maxSingle=${(this.MAX_SINGLE_FILE_SIZE / 1024).toFixed(0)}KB`,
     );
     logger.info(
       ` Strategy: Collect ALL files -> Cache -> Return summary/partial data to fit MCP limits`,

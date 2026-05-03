@@ -82,7 +82,8 @@ export class AdvancedDeobfuscator {
         confidence: Math.min(0.6 + detectedTechniques.length * 0.05, 0.9),
         warnings: [
           ...warnings,
-          'detectOnly does not invoke a separate legacy detector anymore; techniques are inferred from the current static signature pass.',
+          'detectOnly does not invoke a separate legacy detector anymore; techniques are inferred from the ' +
+            'current static signature pass.',
         ],
         astOptimized: false,
         engine: 'webcrack',

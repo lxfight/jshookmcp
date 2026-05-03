@@ -69,7 +69,10 @@ export class Deobfuscator {
     const transformations = [
       {
         type: 'webcrack',
-        description: `Ran webcrack (unminify=${webcrackResult.optionsUsed.unminify}, unpack=${webcrackResult.optionsUsed.unpack}, jsx=${webcrackResult.optionsUsed.jsx}, mangle=${webcrackResult.optionsUsed.mangle})`,
+        description:
+          `Ran webcrack (unminify=${webcrackResult.optionsUsed.unminify}, unpack=` +
+          `${webcrackResult.optionsUsed.unpack}, ` +
+          `jsx=${webcrackResult.optionsUsed.jsx}, mangle=${webcrackResult.optionsUsed.mangle})`,
         success: true,
       },
       ...(webcrackResult.bundle

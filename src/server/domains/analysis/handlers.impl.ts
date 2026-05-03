@@ -221,7 +221,8 @@ export class CoreAnalysisHandlers {
 
     if (result.totalSize > maxSafeCollectedSize || estimatedResponseSize > maxSafeResponseSize) {
       logger.warn(
-        `Collected code is too large (collected=${(result.totalSize / 1024).toFixed(2)}KB, response=${(estimatedResponseSize / 1024).toFixed(2)}KB), returning summary mode.`,
+        `Collected code is too large (collected=${(result.totalSize / 1024).toFixed(2)}KB, response=` +
+          `${(estimatedResponseSize / 1024).toFixed(2)}KB), returning summary mode.`,
       );
 
       const summaryResult = summarizeResult(result);
